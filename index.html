@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Attendance Checker</title>
+  <style>
+    body { font-family: Arial; padding: 2em; background: #f9f9f9; }
+    .hidden { display: none; }
+    #result-table { margin-top: 1em; border-collapse: collapse; width: 100%; background: white; }
+    #result-table th, #result-table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    input, button { padding: 8px; margin: 4px 0; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Attendance Checker</h2>
+  <div>
+    <label>ID: <input type="text" id="id" /></label><br><br>
+    <label>Password: <input type="password" id="password" /></label><br><br>
+    <button onclick="checkAttendance()">Check Attendance</button>
+  </div>
+
+  <div id="error" style="color: red;"></div>
+  <table id="result-table" class="hidden">
+    <thead><tr id="header-row"></tr></thead>
+    <tbody id="data-rows"></tbody>
+  </table>
+
+  <script>
+    const apiUrl = "PASTE_YOUR_DEPLOYED_SCRIPT_URL_HERE";
+
+    async function checkAttendance() {
+      document.getElementById("error").textContent = "";
+      document.getElementById("result-table").classList.add("hidden");
+
+      const id = document.getElementById("id").value.trim();
+      const password = document.getElementById("password").value.trim();
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        body: JSON.stringify({ id, password }),
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        document.getElementById("error").textContent = result.error;
+        return;
+      }
+
+      const data = result.data;
+      if (data.length === 0) {
+        document.getElementById("error").textContent = "No records found.";
+        return;
+      }
+
+      const headers = Object.keys(data[0]);
+      const headerRow = document.getElementById("header-row");
+      headerRow.innerHTML = headers.map(h => `<th>${h}</th>`).join("");
+
+      const dataRows = document.getElementById("data-rows");
+      dataRows.innerHTML = data.map(row =>
+        `<tr>${headers.map(h => `<td>${row[h]}</td>`).join("")}</tr>`
+      ).join("");
+
+      document.getElementById("result-table").classList.remove("hidden");
+    }
+  </script>
+</body>
+</html>
