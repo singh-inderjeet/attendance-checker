@@ -1,162 +1,76 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attendance Checker</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f6f8;
-      padding: 40px;
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background-color: #f0f4f8;
       color: #333;
     }
-    .container {
-      max-width: 500px;
-      margin: auto;
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    h1 {
+      color: #0066cc;
     }
-    h2 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    label {
-      display: block;
-      margin-top: 15px;
-    }
-    input {
+    input, button {
+      padding: 0.5rem;
+      margin: 0.5rem 0;
       width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+      max-width: 300px;
     }
     button {
-      width: 100%;
-      padding: 12px;
-      background-color: #007BFF;
+      background-color: #0066cc;
       color: white;
       border: none;
-      border-radius: 5px;
-      font-size: 16px;
-      margin-top: 20px;
       cursor: pointer;
     }
     button:hover {
-      background-color: #0056b3;
+      background-color: #005bb5;
     }
-    .error {
-      color: red;
-      margin-top: 15px;
-      text-align: center;
-    }
-    .loader {
-      display: none;
-      margin: 10px auto;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #007BFF;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    table {
-      margin-top: 20px;
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      padding: 10px;
-      border: 1px solid #ccc;
-      text-align: left;
-    }
-    th {
-      background-color: #007BFF;
-      color: white;
+    pre {
+      background: #eaeaea;
+      padding: 1rem;
+      max-width: 600px;
+      overflow: auto;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Attendance Checker</h2>
-    <label for="id">User ID</label>
-    <input type="text" id="id" placeholder="Enter your ID">
-
-    <label for="password">Password</label>
-    <input type="password" id="password" placeholder="Enter your password">
-
-    <button onclick="checkAttendance()">Check Attendance</button>
-
-    <div class="loader" id="loader"></div>
-    <div id="error" class="error"></div>
-
-    <table id="result-table" style="display: none;">
-      <thead><tr id="header-row"></tr></thead>
-      <tbody id="data-rows"></tbody>
-    </table>
-  </div>
+  <h1>Attendance Checker</h1>
+  <input type="text" id="userId" placeholder="Enter ID">
+  <input type="password" id="password" placeholder="Enter Password">
+  <button onclick="checkAttendance()">Check</button>
+  <pre id="result">Enter your ID and password to see results.</pre>
 
   <script>
-    const apiUrl = "https://script.google.com/macros/s/AKfycbwgUvFb00ScX5y3sCm4mc_2fAdrl5hNfEmjYSSE0iSV5-aZPpBfAMfsoEuTV887-4aI/exec";
+    const apiUrl = "https://script.google.com/macros/s/AKfycbz0bUTFWtLsV0oFkqbfnn5P-BgNJfYREidkJCJztJjDgCGIefOIp7mzVzaaffyEbDDl/exec";
 
-    async function checkAttendance() {
-      const id = document.getElementById("id").value.trim();
-      const password = document.getElementById("password").value.trim();
-      const errorDiv = document.getElementById("error");
-      const loader = document.getElementById("loader");
-      const resultTable = document.getElementById("result-table");
-      const headerRow = document.getElementById("header-row");
-      const dataRows = document.getElementById("data-rows");
+    function checkAttendance() {
+      const id = document.getElementById("userId").value;
+      const password = document.getElementById("password").value;
+      document.getElementById("result").textContent = "Checking...";
 
-      errorDiv.textContent = "";
-      resultTable.style.display = "none";
-      loader.style.display = "block";
-
-      try {
-        const response = await fetch(apiUrl, {
-          method: "POST",
-          body: JSON.stringify({ id, password }),
-          headers: { "Content-Type": "application/json" }
-        });
-
-        const result = await response.json();
-        loader.style.display = "none";
-
-        if (result.error) {
-          errorDiv.textContent = result.error;
-          return;
+      fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ id, password })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          document.getElementById("result").textContent = "❌ " + data.error;
+        } else {
+          document.getElementById("result").textContent = JSON.stringify(data.data, null, 2);
         }
-
-        const data = result.data;
-        if (!data || data.length === 0) {
-          errorDiv.textContent = "No attendance records found.";
-          return;
-        }
-
-        headerRow.innerHTML = "";
-        dataRows.innerHTML = "";
-
-        const headers = Object.keys(data[0]);
-        headerRow.innerHTML = headers.map(h => `<th>${h}</th>`).join("");
-
-        dataRows.innerHTML = data.map(row =>
-          `<tr>${headers.map(h => `<td>${row[h]}</td>`).join("")}</tr>`
-        ).join("");
-
-        resultTable.style.display = "table";
-
-      } catch (err) {
-        loader.style.display = "none";
-        errorDiv.textContent = "An unexpected error occurred. Please try again later.";
-        console.error(err);
-      }
+      })
+      .catch(error => {
+        document.getElementById("result").textContent = "🚨 Network error. Please try again later.";
+        console.error(error);
+      });
     }
   </script>
 </body>
