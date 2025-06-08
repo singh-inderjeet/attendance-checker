@@ -2,99 +2,216 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Attendance Checker</title>
+  <title>Employee Attendance Portal</title>
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #f5f8fa;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem;
-    }
-    h1 {
-      color: #333;
-    }
-    .card {
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      padding: 2rem;
-      max-width: 400px;
-      width: 100%;
-    }
-    input {
-      width: 100%;
-      padding: 0.5rem;
-      margin-top: 0.5rem;
-      margin-bottom: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      padding: 0.6rem 1rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    pre {
-      background: #f1f1f1;
-      padding: 1rem;
-      border-radius: 4px;
-      margin-top: 1rem;
-      white-space: pre-wrap;
-    }
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; }
+    #loginForm, #dashboard, #requestsDiv, #changePassDiv { margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 5px; }
+    th { background-color: #f4f4f4; }
+    button { margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>📋 Attendance Checker</h1>
-  <div class="card">
-    <label for="userId">User ID</label>
-    <input type="text" id="userId" placeholder="Enter your ID" />
 
-    <label for="password">Password</label>
-    <input type="password" id="password" placeholder="Enter your password" />
+<h2>Employee Attendance Portal</h2>
 
-    <button onclick="checkAttendance()">Check Attendance</button>
-    <pre id="result">Your result will appear here...</pre>
-  </div>
+<div id="loginForm">
+  <h3>Login</h3>
+  <input type="text" id="empID" placeholder="Employee ID" required />
+  <input type="password" id="password" placeholder="Password" required />
+  <button onclick="login()">Login</button>
+  <p id="loginMsg" style="color: red;"></p>
+</div>
 
-  <script>
-    const apiUrl = "https://script.google.com/macros/s/AKfycbxM-gwiVDII5rZCtEedipzgH8Em9pO3Q-cCs0K0AZtFq5YggqLIrO4jgwU-tiMTXGhs/exec"; // Replace with your Web App URL
+<div id="dashboard" style="display:none;">
+  <h3>Welcome, <span id="userName"></span> (<span id="userRole"></span>)</h3>
+  <button onclick="logout()">Logout</button>
+  <button onclick="showChangePassword()">Change Password</button>
 
-    function checkAttendance() {
-      const id = document.getElementById("userId").value.trim();
-      const password = document.getElementById("password").value.trim();
-      const resultBox = document.getElementById("result");
+  <h4>Your Attendance for this month:</h4>
+  <table id="attendanceTable">
+    <thead>
+      <tr><th>Day</th><!-- days 1 to 31 will be appended here --></tr>
+    </thead>
+    <tbody>
+      <tr id="attendanceRow"></tr>
+    </tbody>
+  </table>
 
-      if (!id || !password) {
-        resultBox.textContent = "⚠️ Please enter both ID and password.";
+  <h4>Raise a Request:</h4>
+  <select id="requestType">
+    <option value="Mis Punch">Mis Punch</option>
+    <option value="Overtime">Overtime</option>
+    <option value="Salary Release">Salary Release</option>
+  </select>
+  <br />
+  <textarea id="requestDesc" placeholder="Describe your request..." rows="3" cols="50"></textarea>
+  <br />
+  <button onclick="raiseRequest()">Submit Request</button>
+  <p id="requestMsg"></p>
+
+  <div id="requestsDiv" style="margin-top:30px;"></div>
+</div>
+
+<div id="changePassDiv" style="display:none; margin-top:20px;">
+  <h4>Change Password</h4>
+  <input type="password" id="newPassword" placeholder="New Password" required />
+  <button onclick="changePassword()">Change Password</button>
+  <button onclick="hideChangePassword()">Cancel</button>
+  <p id="passMsg"></p>
+</div>
+
+<script>
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTwDRP1WfN5e_Dt2VGUoE9ZXg5BO9RGFjaJ0SSjQTrrnLfE9Jotu5HFcq_WGLtqQG35A/exec';  // <-- Paste your deployed Apps Script URL here
+
+  let currentUser = {};
+
+  // Login function
+  async function login() {
+    const empID = document.getElementById('empID').value.trim();
+    const password = document.getElementById('password').value.trim();
+    if (!empID || !password) {
+      document.getElementById('loginMsg').textContent = 'Please enter Employee ID and Password';
+      return;
+    }
+    const resp = await postData({ action: 'login', empID, password });
+    if (resp.success) {
+      currentUser = { empID, role: resp.role, name: resp.employeeName, department: resp.department };
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('userName').textContent = currentUser.name;
+      document.getElementById('userRole').textContent = currentUser.role;
+      loadAttendance();
+      if (currentUser.role === 'HOD') {
+        loadHODRequests();
+      }
+      document.getElementById('loginMsg').textContent = '';
+    } else {
+      document.getElementById('loginMsg').textContent = resp.message;
+    }
+  }
+
+  // Logout function
+  function logout() {
+    currentUser = {};
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('requestsDiv').innerHTML = '';
+    document.getElementById('requestMsg').textContent = '';
+  }
+
+  // Load attendance data
+  async function loadAttendance() {
+    const resp = await postData({ action: 'getAttendance', empID: currentUser.empID });
+    if (resp.success) {
+      const attendanceRow = document.getElementById('attendanceRow');
+      attendanceRow.innerHTML = '';
+      // Clear and add day headers
+      const theadRow = document.querySelector('#attendanceTable thead tr');
+      theadRow.innerHTML = '<th>Day</th>';
+      for (let i = 1; i <= 31; i++) {
+        const th = document.createElement('th');
+        th.textContent = i;
+        theadRow.appendChild(th);
+      }
+      resp.attendance.forEach(status => {
+        const td = document.createElement('td');
+        td.textContent = status;
+        attendanceRow.appendChild(td);
+      });
+    }
+  }
+
+  // Raise a request
+  async function raiseRequest() {
+    const requestType = document.getElementById('requestType').value;
+    const description = document.getElementById('requestDesc').value.trim();
+    if (!description) {
+      document.getElementById('requestMsg').textContent = 'Please enter request description';
+      return;
+    }
+    const resp = await postData({ action: 'raiseRequest', empID: currentUser.empID, requestType, description });
+    document.getElementById('requestMsg').textContent = resp.message;
+    document.getElementById('requestDesc').value = '';
+    if (currentUser.role === 'HOD') loadHODRequests();
+  }
+
+  // Load requests for HOD approval
+  async function loadHODRequests() {
+    const resp = await postData({ action: 'getRequestsForHOD', department: currentUser.department });
+    if (resp.success) {
+      const requestsDiv = document.getElementById('requestsDiv');
+      if (resp.requests.length === 0) {
+        requestsDiv.innerHTML = '<h4>No pending requests</h4>';
         return;
       }
-
-      resultBox.textContent = "⏳ Checking attendance...";
-
-      const callbackName = "cb" + Date.now();
-      window[callbackName] = function(response) {
-        if (response.error) {
-          resultBox.textContent = response.error;
-        } else {
-          resultBox.textContent = JSON.stringify(response.data, null, 2);
-        }
-        delete window[callbackName];
-      };
-
-      const script = document.createElement("script");
-      script.src = `${apiUrl}?callback=${callbackName}&id=${encodeURIComponent(id)}&password=${encodeURIComponent(password)}`;
-      document.body.appendChild(script);
+      let html = '<h4>Requests to approve:</h4><table><tr><th>Request ID</th><th>Employee ID</th><th>Type</th><th>Description</th><th>Date</th><th>Status</th><th>Action</th></tr>';
+      resp.requests.forEach(r => {
+        html += `<tr>
+          <td>${r.requestID}</td>
+          <td>${r.employeeID}</td>
+          <td>${r.requestType}</td>
+          <td>${r.description}</td>
+          <td>${r.date}</td>
+          <td>${r.status}</td>
+          <td>
+            ${r.status === 'Pending' ? `<button onclick="updateRequestStatus(${r.requestID}, 'Approved')">Approve</button> <button onclick="updateRequestStatus(${r.requestID}, 'Rejected')">Reject</button>` : r.status}
+          </td>
+        </tr>`;
+      });
+      html += '</table>';
+      requestsDiv.innerHTML = html;
     }
-  </script>
+  }
+
+  // Update request status (Approve/Reject)
+  async function updateRequestStatus(requestID, status) {
+    const resp = await postData({ action: 'updateRequestStatus', requestID, status });
+    alert(resp.message);
+    loadHODRequests();
+  }
+
+  // Show change password form
+  function showChangePassword() {
+    document.getElementById('changePassDiv').style.display = 'block';
+  }
+
+  // Hide change password form
+  function hideChangePassword() {
+    document.getElementById('changePassDiv').style.display = 'none';
+    document.getElementById('passMsg').textContent = '';
+  }
+
+  // Change password
+  async function changePassword() {
+    const newPassword = document.getElementById('newPassword').value.trim();
+    if (!newPassword) {
+      document.getElementById('passMsg').textContent = 'Enter new password';
+      return;
+    }
+    const resp = await postData({ action: 'changePassword', empID: currentUser.empID, newPassword });
+    document.getElementById('passMsg').textContent = resp.message;
+    if (resp.success) {
+      document.getElementById('newPassword').value = '';
+      setTimeout(hideChangePassword, 2000);
+    }
+  }
+
+  // Helper function to POST data to Apps Script
+  async function postData(data) {
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+</script>
+
 </body>
 </html>
 
